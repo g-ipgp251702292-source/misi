@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HEAD TILT CHALLENGE: MISI KATA NAFI</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- MediaPipe Script -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #fbc531, #e84118);
+            min-height: 100vh;
+        }
+        .title-font {
+            font-family: 'Comic Neue', cursive;
+        }
+        .mirror-mode {
+            transform: scaleX(-1);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4 text-gray-800">
+
+    <header class="text-center mb-4">
+        <h1 class="title-font text-3xl md:text-5xl text-white drop-shadow-md tracking-wider">🎮 HEAD TILT CHALLENGE 🎮</h1>
+        <p class="text-white text-lg font-semibold drop-shadow">Misi Kata Nafi (Tahun 4)</p>
+    </header>
+
+    <main class="w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-6 relative overflow-hidden border-4 border-yellow-300">
+
+        <!-- Skrin 1: Sambutan -->
+        <div id="screen-welcome" class="text-center py-8">
+            <div class="text-6xl mb-4">🤖</div>
+            <h2 class="title-font text-3xl text-indigo-600 mb-4">Selamat Datang ke Pengembaraan Kata Nafi!</h2>
+            <p class="text-gray-600 max-w-lg mx-auto mb-6 text-base">
+                Condongkan kepala ke <b>KIRI</b> untuk pilih TIDAK, atau ke <b>KANAN</b> untuk pilih BUKAN. (Anda juga boleh klik pada pilihan jika kamera lewat mengesan).
+            </p>
+            <button onclick="startApp()" class="bg-green-500 hover:bg-green-600 text-white font-bold text-xl py-3 px-8 rounded-full shadow-lg transition transform hover:scale-105 cursor-pointer">
+                Mula Bermain 🚀
+            </button>
+        </div>
+
+        <!-- Skrin 2: Permainan -->
+        <div id="screen-game" class="hidden flex flex-col md:flex-row gap-6 items-center">
+            
+            <div class="w-full md:w-1/2 flex flex-col items-center relative">
+                <div class="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-inner border-4 border-indigo-400">
+                    <video id="webcam" class="w-full h-full object-cover mirror-mode" autoplay playsinline></video>
+                    <canvas id="output_canvas" class="absolute top-0 left-0 w-full h-full pointer-events-none mirror-mode"></canvas>
+                </div>
+                <div id="tilt-indicator" class="mt-3 bg-indigo-100 text-indigo-700 font-bold px-4 py-2 rounded-full text-sm shadow-sm flex items-center gap-2">
+                    <span>📏 Kamera sedang diaktifkan...</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3 mt-2 overflow-hidden border border-gray-300">
+                    <div id="timer-bar" class="bg-green-500 h-full w-full transition-all duration-100" style="width: 0%;"></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Pandang skrin dan condongkan kepala.</p>
+            </div>
+
+            <div class="w-full md:w-1/2 flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <span id="question-counter" class="bg-yellow-400 text-yellow-900 font-bold text-sm px-3 py-1 rounded-full">Soalan 1 / 10</span>
+                        <span id="score-display" class="bg-indigo-100 text-indigo-800 font-bold text-sm px-3 py-1 rounded-full">Markah: 0</span>
+                    </div>
+                    <div class="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-5 mb-4 text-center">
+                        <p id="question-text" class="text-lg md:text-xl font-semibold text-gray-800 leading-relaxed">
+                            Memuatkan soalan...
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Pilihan Jawapan (Boleh diklik juga sebagai sandaran) -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div id="choice-left" onclick="manualSelect('TIDAK')" class="border-4 border-blue-400 bg-blue-50 rounded-2xl p-4 text-center font-bold text-xl text-blue-700 shadow-md transition-all cursor-pointer hover:bg-blue-100">
+                        👈 KIRI<br><span id="text-left" class="text-2xl">TIDAK</span>
+                    </div>
+                    <div id="choice-right" onclick="manualSelect('BUKAN')" class="border-4 border-purple-400 bg-purple-50 rounded-2xl p-4 text-center font-bold text-xl text-purple-700 shadow-md transition-all cursor-pointer hover:bg-purple-100">
+                        KANAN 👉<br><span id="text-right" class="text-2xl">BUKAN</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Skrin 3: Maklum Balas -->
+        <div id="screen-feedback" class="hidden text-center py-10">
+            <div id="feedback-icon" class="text-6xl mb-3">🎉</div>
+            <h3 id="feedback-title" class="title-font text-3xl mb-2 text-green-600">TAHNIAH! JAWAPAN ANDA BETUL!</h3>
+            <p id="feedback-desc" class="text-gray-600 text-base max-w-md mx-auto mb-6">Penerangan...</p>
+            <button onclick="nextQuestion()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-6 rounded-full shadow cursor-pointer">
+                Soalan Seterusnya ➡️
+            </button>
+        </div>
+
+        <!-- Skrin 4: Keputusan Akhir -->
+        <div id="screen-result" class="hidden text-center py-8">
+            <div class="text-6xl mb-3">🏆</div>
+            <h3 class="title-font text-4xl text-indigo-700 mb-4">Tahniah, Misi Selesai!</h3>
+            <div class="bg-yellow-50 border-4 border-yellow-200 rounded-2xl p-6 max-w-md mx-auto mb-6 shadow-inner">
+                <p class="text-lg text-gray-700">Jumlah Markah:</p>
+                <p id="final-score" class="text-5xl font-bold text-yellow-600 my-2">100 / 100</p>
+                <div class="flex justify-around mt-4 text-sm font-semibold">
+                    <span class="text-green-600">Betul: <span id="correct-count">10</span></span>
+                    <span class="text-red-500">Salah: <span id="wrong-count">0</span></span>
+                </div>
+            </div>
+            <button onclick="restartGame()" class="bg-green-500 hover:bg-green-600 text-white font-bold text-lg py-3 px-8 rounded-full shadow-lg transition transform hover:scale-105 cursor-pointer">
+                Main Semula 🔄
+            </button>
+        </div>
+
+    </main>
+
+    <script>
+        const questions = [
+            { q: "Adik ______ pergi ke sekolah kerana demam.", ans: "TIDAK", expl: "'Tidak' digunakan untuk frasa kerja (pergi ke sekolah)." },
+            { q: "Kucing itu ______ haiwan liar.", ans: "BUKAN", expl: "'Bukan' digunakan di hadapan frasa nama (haiwan liar)." },
+            { q: "Aiman ______ suka makan sayur.", ans: "TIDAK", expl: "'Tidak' digunakan di hadapan frasa kerja (suka)." },
+            { q: "Perempuan yang memakai baju merah itu ______ kakak saya.", ans: "BUKAN", expl: "'Bukan' digunakan di hadapan frasa nama (kakak saya)." },
+            { q: "Murid-murid ______ dibenarkan bermain di dalam kelas.", ans: "TIDAK", expl: "'Tidak' digunakan di hadapan frasa kerja (dibenarkan)." },
+            { q: "Buku yang tebal itu ______ milik Farah.", ans: "BUKAN", expl: "'Bukan' digunakan di hadapan frasa sendi nama (milik Farah)." },
+            { q: "Adik ______ dapat menyiapkan kerja sekolahnya.", ans: "TIDAK", expl: "'Tidak' digunakan di hadapan frasa kerja (dapat menyiapkan)." },
+            { q: "Harimau ______ haiwan peliharaan.", ans: "BUKAN", expl: "'Bukan' digunakan di hadapan frasa nama (haiwan peliharaan)." },
+            { q: "Mereka ______ hadir ke latihan bola sepak pada petang semalam.", ans: "TIDAK", expl: "'Tidak' digunakan di hadapan frasa kerja (hadir)." },
+            { q: "Lelaki yang berdiri di hadapan itu ______ guru kelas kami.", ans: "BUKAN", expl: "'Bukan' digunakan di hadapan frasa nama (guru kelas kami)." }
+        ];
+
+        let currentIdx = 0;
+        let score = 0;
+        let correctTotal = 0;
+        let wrongTotal = 0;
+        let gameActive = false;
+        let holdStartTime = null;
+        const requiredHoldTime = 2000;
+        let selectedDirection = null;
+
+        const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        let cameraInstance = null;
+
+        function showScreen(screenId) {
+            ['screen-welcome', 'screen-game', 'screen-feedback', 'screen-result'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function startApp() {
+            showScreen('screen-game');
+            currentIdx = 0;
+            score = 0;
+            correctTotal = 0;
+            wrongTotal = 0;
+            loadQuestion();
+            initCamera();
+        }
+
+        function loadQuestion() {
+            if (currentIdx >= questions.length) {
+                showResult();
+                return;
+            }
+            const currentQ = questions[currentIdx];
+            document.getElementById('question-counter').innerText = `Soalan ${currentIdx + 1} / 10`;
+            document.getElementById('score-display').innerText = `Markah: ${score}`;
+            document.getElementById('question-text').innerHTML = currentQ.q;
+            
+            gameActive = true;
+            holdStartTime = null;
+            selectedDirection = null;
+        }
+
+        function initCamera() {
+            try {
+                const faceMesh = new FaceMesh({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+                });
+
+                faceMesh.setOptions({
+                    maxNumFaces: 1,
+                    refineLandmarks: true,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                faceMesh.onResults(onFaceResults);
+
+                cameraInstance = new Camera(videoElement, {
+                    onFrame: async () => {
+                        if (gameActive) {
+                            await faceMesh.send({ image: videoElement });
+                        }
+                    },
+                    width: 640,
+                    height: 480
+                });
+                cameraInstance.start().catch(err => {
+                    console.warn("Kamera tidak dapat diakses, butang sentuh masih berfungsi.", err);
+                    document.getElementById('tilt-indicator').innerText = "⚠️ Kamera ditutup - Sila guna butang klik kiri/kanan";
+                });
+            } catch (e) {
+                console.error("Ralat init kamera:", e);
+                document.getElementById('tilt-indicator').innerText = "⚠️ Mod Sandaran Aktif (Klik pilihan bawah)";
+            }
+        }
+
+        function onFaceResults(results) {
+            canvasElement.width = videoElement.videoWidth || 640;
+            canvasElement.height = videoElement.videoHeight || 480;
+            
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            if (!gameActive || !results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+                updateTiltIndicator("Cari wajah di kamera...", 0);
+                canvasCtx.restore();
+                return;
+            }
+
+            const landmarks = results.multiFaceLandmarks[0];
+            const nose = landmarks[1];
+            const leftEye = landmarks[33];
+            const rightEye = landmarks[263];
+
+            const eyeMidX = (leftEye.x + rightEye.x) / 2;
+            const tiltOffset = nose.x - eyeMidX;
+
+            let currentDir = null;
+            let statusText = "Posisi Kepala: Tegak 🟢";
+            let barWidth = 0;
+
+            if (tiltOffset > 0.04) {
+                currentDir = 'left';
+                statusText = "👉 Condong ke KIRI (Pilih: TIDAK)";
+            } else if (tiltOffset < -0.04) {
+                currentDir = 'right';
+                statusText = "👈 Condong ke KANAN (Pilih: BUKAN)";
+            }
+
+            if (currentDir) {
+                if (selectedDirection === currentDir) {
+                    const elapsed = Date.now() - holdStartTime;
+                    barWidth = Math.min(100, (elapsed / requiredHoldTime) * 100);
+                    
+                    if (elapsed >= requiredHoldTime) {
+                        gameActive = false;
+                        checkAnswer(currentDir === 'left' ? "TIDAK" : "BUKAN");
+                    }
+                } else {
+                    selectedDirection = currentDir;
+                    holdStartTime = Date.now();
+                }
+            } else {
+                selectedDirection = null;
+                holdStartTime = null;
+            }
+
+            updateTiltIndicator(statusText, barWidth);
+            canvasCtx.restore();
+        }
+
+        function updateTiltIndicator(text, progress) {
+            document.getElementById('tilt-indicator').innerHTML = `<span>${text}</span>`;
+            document.getElementById('timer-bar').style.width = `${progress}%`;
+            
+            document.getElementById('choice-left').classList.remove('border-green-600', 'bg-green-100');
+            document.getElementById('choice-right').classList.remove('border-green-600', 'bg-green-100');
+            
+            if (selectedDirection === 'left') {
+                document.getElementById('choice-left').classList.add('border-green-600', 'bg-green-100');
+            } else if (selectedDirection === 'right') {
+                document.getElementById('choice-right').classList.add('border-green-600', 'bg-green-100');
+            }
+        }
+
+        // Fungsi manual untuk memastikan permainan tetap "go" walau apa pun
+        function manualSelect(chosenAns) {
+            if (!gameActive) return;
+            gameActive = false;
+            checkAnswer(chosenAns);
+        }
+
+        function checkAnswer(chosenAns) {
+            const currentQ = questions[currentIdx];
+            const isCorrect = (chosenAns === currentQ.ans);
+
+            showScreen('screen-feedback');
+            const titleEl = document.getElementById('feedback-title');
+            const descEl = document.getElementById('feedback-desc');
+            const iconEl = document.getElementById('feedback-icon');
+
+            if (isCorrect) {
+                score += 10;
+                correctTotal++;
+                iconEl.innerText = "🌟";
+                titleEl.className = "title-font text-3xl mb-2 text-green-600";
+                titleEl.innerText = "TAHNIAH! JAWAPAN ANDA BETUL!";
+                descEl.innerHTML = `Anda memilih <b>${chosenAns}</b>.<br><br>${currentQ.expl}`;
+            } else {
+                wrongTotal++;
+                iconEl.innerText = "❌";
+                titleEl.className = "title-font text-3xl mb-2 text-red-600";
+                titleEl.innerText = "CUBA LAGI! JAWAPAN SALAH";
+                descEl.innerHTML = `Jawapan yang betul ialah: <b>${currentQ.ans}</b>.<br><br>${currentQ.expl}`;
+            }
+        }
+
+        function nextQuestion() {
+            currentIdx++;
+            showScreen('screen-game');
+            loadQuestion();
+        }
+
+        function showResult() {
+            showScreen('screen-result');
+            document.getElementById('final-score').innerText = `${score} / 100`;
+            document.getElementById('correct-count').innerText = correctTotal;
+            document.getElementById('wrong-count').innerText = wrongTotal;
+        }
+
+        function restartGame() {
+            startApp();
+        }
+    </script>
+</body>
+</html>
